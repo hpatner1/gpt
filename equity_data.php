@@ -16,9 +16,10 @@ $equityStmt = $pdo->prepare(
 $equityStmt->execute(['user_id' => $userId]);
 
 $rows = $equityStmt->fetchAll();
-$equity = 0.0;
-$data = [];
 $baselineBalance = isset($rows[0]['account_balance']) ? (float) $rows[0]['account_balance'] : 0.0;
+$equity = $baselineBalance;
+$peak = $baselineBalance;
+$data = [];
 
 foreach ($rows as $row) {
     if ($row['status'] === 'Win') {
@@ -27,10 +28,15 @@ foreach ($rows as $row) {
         $equity -= (float) $row['risk_amount'];
     }
 
+    if ($equity > $peak) {
+        $peak = $equity;
+    }
+
     $data[] = [
         'date' => $row['trade_date'],
-        'equity' => round($baselineBalance + $equity, 2),
+        'equity' => round($equity, 2),
         'balance' => round($baselineBalance, 2),
+        'peak' => round($peak, 2),
     ];
 }
 

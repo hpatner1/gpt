@@ -3,7 +3,7 @@ require_once __DIR__ . '/includes/auth.php';
 require_login();
 
 $userId = current_user_id();
-$search = trim($_GET['search'] ?? '');
+$search = trim((string) ($_GET['search'] ?? ''));
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $perPage = 10;
 $offset = ($page - 1) * $perPage;
@@ -54,7 +54,7 @@ $accountGrowth = $totalRisked > 0 ? ($totalPnL / $totalRisked) * 100 : 0;
 $lossAlertStmt = $pdo->prepare('SELECT status FROM trades WHERE user_id = :user_id ORDER BY trade_date DESC, id DESC LIMIT 3');
 $lossAlertStmt->execute(['user_id' => $userId]);
 $recentStatuses = $lossAlertStmt->fetchAll(PDO::FETCH_COLUMN);
-$consecutiveLossAlert = count($recentStatuses) === 3 && count(array_filter($recentStatuses, fn($s) => $s === 'Loss')) === 3;
+$consecutiveLossAlert = count($recentStatuses) === 3 && count(array_filter($recentStatuses, static fn($s) => $s === 'Loss')) === 3;
 
 $pageTitle = 'Dashboard - ' . APP_NAME;
 $extraHeadScripts = ['https://cdn.jsdelivr.net/npm/chart.js'];
@@ -64,7 +64,7 @@ require __DIR__ . '/includes/header.php';
     <a class="active" href="#overview">Dashboard</a>
     <a href="#trades">Journal</a>
     <a href="#analytics">Analytics</a>
-    <a href="reports.php">Reports</a>
+    <a href="#market">Market</a>
 </section>
 
 <section id="overview">
@@ -98,6 +98,10 @@ require __DIR__ . '/includes/header.php';
     </div>
     <div class="advanced-grid" id="advancedMetricsGrid">
         <article class="metric-card"><h4>Max Drawdown %</h4><p id="metricMaxDrawdownPercent">--</p></article>
+        <article class="metric-card"><h4>Current Drawdown %</h4><p id="metricCurrentDrawdownPercent">--</p></article>
+        <article class="metric-card"><h4>Current Equity</h4><p id="metricCurrentEquity">--</p></article>
+        <article class="metric-card"><h4>Peak Equity</h4><p id="metricPeakEquity">--</p></article>
+        <article class="metric-card"><h4>Recovery Factor</h4><p id="metricRecoveryFactor">--</p></article>
         <article class="metric-card"><h4>Profit Factor</h4><p id="metricProfitFactor">--</p></article>
         <article class="metric-card"><h4>Average Win</h4><p id="metricAvgWin">--</p></article>
         <article class="metric-card"><h4>Average Loss</h4><p id="metricAvgLoss">--</p></article>
@@ -106,6 +110,30 @@ require __DIR__ . '/includes/header.php';
         <article class="metric-card"><h4>Total Closed Trades</h4><p id="metricClosedTrades">--</p></article>
         <article class="metric-card"><h4>Expectancy / Trade</h4><p id="metricExpectancyPerTrade">--</p></article>
         <article class="metric-card"><h4>Expectancy % (Risk)</h4><p id="metricExpectancyPercent">--</p></article>
+    </div>
+
+    <div class="analytics-split-grid">
+        <article class="metric-card">
+            <h4>Strategy Performance</h4>
+            <p class="muted tiny">Best Strategy: <span id="bestStrategyLabel">--</span></p>
+            <div class="table-wrap compact-table-wrap">
+                <table id="strategyPerformanceTable">
+                    <thead><tr><th>Strategy</th><th>Trades</th><th>Win Rate</th><th>Net Profit</th></tr></thead>
+                    <tbody><tr><td colspan="4">No strategy data yet.</td></tr></tbody>
+                </table>
+            </div>
+        </article>
+
+        <article class="metric-card">
+            <h4>Session Performance</h4>
+            <p class="muted tiny">Best Session: <span id="bestSessionLabel">--</span></p>
+            <div class="table-wrap compact-table-wrap">
+                <table id="sessionPerformanceTable">
+                    <thead><tr><th>Session</th><th>Trades</th><th>Win Rate</th><th>Net Profit</th></tr></thead>
+                    <tbody><tr><td colspan="4">No session data yet.</td></tr></tbody>
+                </table>
+            </div>
+        </article>
     </div>
 
     <div class="risk-ruin-box">
@@ -123,6 +151,28 @@ require __DIR__ . '/includes/header.php';
     </div>
 </section>
 
+<section id="market" class="card panel market-panel">
+    <div class="panel-head">
+        <h3>Live Market Panel</h3>
+    </div>
+    <form id="marketSearchForm" class="search-form market-search-form">
+        <input type="text" id="marketCoinSymbol" maxlength="10" placeholder="Enter coin symbol (e.g. BTC)" required>
+        <button type="submit">Live Update</button>
+    </form>
+
+    <div class="market-grid" id="marketDataGrid">
+        <article class="metric-card"><h4>Coin Name</h4><p id="marketCoinName">--</p></article>
+        <article class="metric-card"><h4>Live Price</h4><p id="marketLivePrice">--</p></article>
+        <article class="metric-card"><h4>24h %</h4><p id="marketChange24h">--</p></article>
+        <article class="metric-card"><h4>Market Cap</h4><p id="marketCap">--</p></article>
+        <article class="metric-card"><h4>24h Volume</h4><p id="marketVolume">--</p></article>
+    </div>
+    <div class="market-actions">
+        <button type="button" id="useLivePriceBtn">Use Live Price</button>
+        <p class="muted" id="marketStatusText">Search a coin to load live data.</p>
+    </div>
+</section>
+
 <section id="calculator" class="card panel">
     <h3>Risk Calculator (Spot)</h3>
     <form id="calculatorForm" method="POST" action="calculate.php">
@@ -130,7 +180,7 @@ require __DIR__ . '/includes/header.php';
         <div class="grid-2">
             <div><label>Account Balance</label><input type="number" step="0.01" name="balance" required></div>
             <div><label>Risk % per Trade</label><input type="number" step="0.01" name="risk_percent" required></div>
-            <div><label>Entry Price</label><input type="number" step="0.00000001" name="entry_price" required></div>
+            <div><label>Entry Price</label><input id="calculatorEntryPrice" type="number" step="0.00000001" name="entry_price" required></div>
             <div><label>Stop Loss Price</label><input type="number" step="0.00000001" name="stop_loss_price" required></div>
             <div><label>Take Profit Price</label><input type="number" step="0.00000001" name="take_profit_price" required></div>
             <div><label>Coin Name (optional)</label><input type="text" name="coin_name" maxlength="25"></div>
@@ -158,17 +208,19 @@ require __DIR__ . '/includes/header.php';
         <table>
             <thead>
             <tr>
-                <th>Date</th><th>Coin</th><th>Entry</th><th>SL</th><th>TP</th><th>RR</th><th>Status</th><th>Actions</th>
+                <th>Date</th><th>Coin</th><th>Strategy</th><th>Session</th><th>Entry</th><th>SL</th><th>TP</th><th>RR</th><th>Status</th><th>Actions</th>
             </tr>
             </thead>
             <tbody>
             <?php if (!$trades): ?>
-                <tr><td colspan="8">No trades found.</td></tr>
+                <tr><td colspan="10">No trades found.</td></tr>
             <?php else: ?>
                 <?php foreach ($trades as $trade): ?>
                     <tr>
                         <td><?php echo e($trade['trade_date']); ?></td>
                         <td><?php echo e($trade['coin_name']); ?></td>
+                        <td><?php echo e((string) ($trade['strategy'] ?: '-')); ?></td>
+                        <td><?php echo e((string) ($trade['session'] ?: '-')); ?></td>
                         <td><?php echo e($trade['entry_price']); ?></td>
                         <td><?php echo e($trade['stop_loss_price']); ?></td>
                         <td><?php echo e($trade['take_profit_price']); ?></td>
