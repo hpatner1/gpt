@@ -84,15 +84,32 @@ function current_user_id(): ?int
     return isset($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : null;
 }
 
-function calculate_risk_metrics(float $balance, float $riskPercent, float $entry, float $stopLoss, float $takeProfit): array
-{
+function calculate_trade_metrics(
+    float $balance,
+    float $riskPercent,
+    float $entry,
+    float $stopLoss,
+    float $takeProfit,
+    ?float $tp1 = null,
+    ?float $tp2 = null,
+    float $partialClosePercent = 0.0
+): array {
     $riskAmount = $balance * ($riskPercent / 100);
     $riskPerUnit = abs($entry - $stopLoss);
-    $rewardPerUnit = abs($takeProfit - $entry);
-
     $positionSize = $riskPerUnit > 0 ? $riskAmount / $riskPerUnit : 0.0;
+
+    $tp1Price = $tp1 !== null && $tp1 > 0 ? $tp1 : $takeProfit;
+    $tp2Price = $tp2 !== null && $tp2 > 0 ? $tp2 : $takeProfit;
+    $partial = max(0.0, min(100.0, $partialClosePercent));
+    $remaining = 100.0 - $partial;
+
+    $tp1Units = $positionSize * ($partial / 100);
+    $tp2Units = $positionSize * ($remaining / 100);
+
+    $tp1Reward = abs($tp1Price - $entry) * $tp1Units;
+    $tp2Reward = abs($tp2Price - $entry) * $tp2Units;
+    $potentialProfit = $tp1Reward + $tp2Reward;
     $potentialLoss = $riskAmount;
-    $potentialProfit = $positionSize * $rewardPerUnit;
     $rrRatio = $potentialLoss > 0 ? ($potentialProfit / $potentialLoss) : 0.0;
 
     return [
@@ -101,5 +118,16 @@ function calculate_risk_metrics(float $balance, float $riskPercent, float $entry
         'rr_ratio' => round($rrRatio, 2),
         'potential_profit' => round($potentialProfit, 2),
         'potential_loss' => round($potentialLoss, 2),
+        'tp1_price' => round($tp1Price, 8),
+        'tp2_price' => round($tp2Price, 8),
+        'partial_close_percent' => round($partial, 2),
+        'remaining_close_percent' => round($remaining, 2),
+        'tp1_profit' => round($tp1Reward, 2),
+        'tp2_profit' => round($tp2Reward, 2),
     ];
+}
+
+function calculate_risk_metrics(float $balance, float $riskPercent, float $entry, float $stopLoss, float $takeProfit): array
+{
+    return calculate_trade_metrics($balance, $riskPercent, $entry, $stopLoss, $takeProfit);
 }

@@ -334,3 +334,23 @@ th, td { padding: 10px; border-bottom: 1px solid var(--border); text-align: left
     width: auto;
     padding: 10px 16px;
 }
+
+textarea {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #0d1729;
+    color: var(--text);
+}
+
+.badge.partially-closed {
+    background: #3d3416;
+    color: #ffe69a;
+}
+
+canvas {
+    width: 100% !important;
+    min-height: 260px;
+    max-height: 320px;
+}

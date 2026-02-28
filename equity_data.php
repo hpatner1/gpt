@@ -7,10 +7,10 @@ header('Content-Type: application/json; charset=utf-8');
 $userId = current_user_id();
 
 $equityStmt = $pdo->prepare(
-    'SELECT DATE(created_at) AS trade_date, account_balance, status, risk_amount, potential_profit
+    'SELECT DATE(created_at) AS trade_date, account_balance, status, risk_amount, potential_profit, tp1_profit
      FROM trades
      WHERE user_id = :user_id
-       AND status IN ("Win", "Loss")
+       AND status IN ("Win", "Loss", "Partially Closed")
      ORDER BY created_at ASC, id ASC'
 );
 $equityStmt->execute(['user_id' => $userId]);
@@ -26,6 +26,8 @@ foreach ($rows as $row) {
         $equity += (float) $row['potential_profit'];
     } elseif ($row['status'] === 'Loss') {
         $equity -= (float) $row['risk_amount'];
+    } elseif ($row['status'] === 'Partially Closed') {
+        $equity += (float) $row['tp1_profit'];
     }
 
     if ($equity > $peak) {

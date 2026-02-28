@@ -173,6 +173,10 @@
     var sessionTableBody = document.querySelector('#sessionPerformanceTable tbody');
     var bestStrategyLabel = document.getElementById('bestStrategyLabel');
     var bestSessionLabel = document.getElementById('bestSessionLabel');
+    var emotionTableBody = document.querySelector('#emotionPerformanceTable tbody');
+    var emotionBeforeLoss = document.getElementById('emotionBeforeLoss');
+    var emotionBiasPattern = document.getElementById('emotionBiasPattern');
+    var bestEmotionLabel = document.getElementById('bestEmotionLabel');
 
     if (!grid) {
         return;
@@ -215,6 +219,43 @@
         } else {
             el.classList.add('negative');
             el.classList.remove('positive');
+        }
+    }
+
+
+    function renderDistributionCharts(data) {
+        if (typeof Chart === 'undefined') {
+            return;
+        }
+
+        var rrCanvas = document.getElementById('rrDistributionChart');
+        if (rrCanvas && data.rr_distribution) {
+            new Chart(rrCanvas, {
+                type: 'bar',
+                data: {
+                    labels: ['0-1', '1-2', '2-3', '3+'],
+                    datasets: [{ label: 'Trades', data: [data.rr_distribution['0-1'] || 0, data.rr_distribution['1-2'] || 0, data.rr_distribution['2-3'] || 0, data.rr_distribution['3+'] || 0], backgroundColor: '#2e7eff' }]
+                },
+                options: { responsive: true, plugins: { legend: { labels: { color: '#c9d4ee' } } }, scales: { x: { ticks: { color: '#c9d4ee' } }, y: { ticks: { color: '#c9d4ee' } } } }
+            });
+        }
+
+        var profitCanvas = document.getElementById('profitDistributionChart');
+        if (profitCanvas && Array.isArray(data.profit_distribution)) {
+            new Chart(profitCanvas, {
+                type: 'bar',
+                data: { labels: data.profit_distribution.map(function (_, i) { return 'T' + (i + 1); }), datasets: [{ label: 'Profit', data: data.profit_distribution, backgroundColor: data.profit_distribution.map(function (v) { return Number(v) >= 0 ? '#36d399' : '#ff5c7c'; }) }] },
+                options: { responsive: true, plugins: { legend: { labels: { color: '#c9d4ee' } } }, scales: { x: { ticks: { color: '#c9d4ee' } }, y: { ticks: { color: '#c9d4ee' } } } }
+            });
+        }
+
+        var streakCanvas = document.getElementById('streakChart');
+        if (streakCanvas && Array.isArray(data.streak_data)) {
+            new Chart(streakCanvas, {
+                type: 'bar',
+                data: { labels: data.streak_data.map(function (_, i) { return 'S' + (i + 1); }), datasets: [{ label: 'Streak Length', data: data.streak_data.map(function (s) { return s.length; }), backgroundColor: data.streak_data.map(function (s) { return s.type === 'Win' ? '#36d399' : '#ff5c7c'; }) }] },
+                options: { responsive: true, plugins: { legend: { labels: { color: '#c9d4ee' } } }, scales: { x: { ticks: { color: '#c9d4ee' } }, y: { ticks: { color: '#c9d4ee' } } } }
+            });
         }
     }
 
@@ -277,6 +318,12 @@
             if (bestSessionLabel) {
                 bestSessionLabel.textContent = data.best_session || '--';
             }
+
+            fillPerformanceTable(emotionTableBody, data.emotion_performance, 'emotion');
+            if (emotionBeforeLoss) { emotionBeforeLoss.textContent = data.emotion_before_loss || '--'; }
+            if (emotionBiasPattern) { emotionBiasPattern.textContent = data.emotion_bias || '--'; }
+            if (bestEmotionLabel) { bestEmotionLabel.textContent = data.best_emotion || '--'; }
+            renderDistributionCharts(data);
 
             applyPositiveNegative(metricEls.netProfit, data.net_profit || 0);
             applyPositiveNegative(metricEls.expectancyPerTrade, data.expectancy_per_trade || 0);
@@ -345,75 +392,72 @@
     };
 
     var livePrice = null;
+    var autoFillEnabled = false;
+    var currentSymbol = '';
 
-    function formatLarge(value) {
-        return Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
-    }
+    function formatLarge(value) { return Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
 
     function setStatus(message, className) {
-        if (!statusText) {
-            return;
-        }
+        if (!statusText) { return; }
         statusText.textContent = message;
         statusText.classList.remove('positive', 'negative');
-        if (className) {
-            statusText.classList.add(className);
+        if (className) { statusText.classList.add(className); }
+    }
+
+    function applyPayload(payload) {
+        marketEls.name.textContent = payload.name + ' (' + payload.symbol + ')';
+        marketEls.price.textContent = '$' + formatLarge(payload.price);
+        marketEls.change.textContent = Number(payload.change_24h).toFixed(2) + '%';
+        marketEls.marketCap.textContent = '$' + formatLarge(payload.market_cap);
+        marketEls.volume.textContent = '$' + formatLarge(payload.volume_24h);
+        marketEls.change.classList.toggle('positive', Number(payload.change_24h) >= 0);
+        marketEls.change.classList.toggle('negative', Number(payload.change_24h) < 0);
+        livePrice = Number(payload.price);
+        if (autoFillEnabled && calculatorEntryInput) {
+            calculatorEntryInput.value = livePrice.toFixed(8);
         }
+    }
+
+    function fetchMarket(symbol, statusMsg) {
+        currentSymbol = symbol;
+        if (statusMsg) { setStatus(statusMsg); }
+        return fetch('market_data.php?symbol=' + encodeURIComponent(symbol), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (response) {
+                return response.json().then(function (payload) {
+                    if (!response.ok) { throw new Error(payload.error || 'Unable to load market data.'); }
+                    return payload;
+                });
+            })
+            .then(function (payload) {
+                applyPayload(payload);
+                setStatus('Live data updated successfully. Auto-refresh every 30s is active.', 'positive');
+            })
+            .catch(function (error) { setStatus(error.message || 'Unable to load market data.', 'negative'); });
     }
 
     marketForm.addEventListener('submit', function (event) {
         event.preventDefault();
         var symbol = symbolInput.value.trim().toLowerCase();
-        if (!symbol) {
-            return;
-        }
-
-        setStatus('Loading live market data...');
-
-        fetch('market_data.php?symbol=' + encodeURIComponent(symbol), {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        })
-            .then(function (response) {
-                return response.json().then(function (payload) {
-                    if (!response.ok) {
-                        throw new Error(payload.error || 'Unable to load market data.');
-                    }
-                    return payload;
-                });
-            })
-            .then(function (payload) {
-                marketEls.name.textContent = payload.name + ' (' + payload.symbol + ')';
-                marketEls.price.textContent = '$' + formatLarge(payload.price);
-                marketEls.change.textContent = Number(payload.change_24h).toFixed(2) + '%';
-                marketEls.marketCap.textContent = '$' + formatLarge(payload.market_cap);
-                marketEls.volume.textContent = '$' + formatLarge(payload.volume_24h);
-
-                if (Number(payload.change_24h) >= 0) {
-                    marketEls.change.classList.add('positive');
-                    marketEls.change.classList.remove('negative');
-                } else {
-                    marketEls.change.classList.add('negative');
-                    marketEls.change.classList.remove('positive');
-                }
-
-                livePrice = Number(payload.price);
-                setStatus('Live data updated successfully.', 'positive');
-            })
-            .catch(function (error) {
-                setStatus(error.message || 'Unable to load market data.', 'negative');
-            });
+        if (!symbol) { return; }
+        fetchMarket(symbol, 'Loading live market data...');
     });
+
+    setInterval(function () {
+        if (currentSymbol) {
+            fetchMarket(currentSymbol, 'Auto-refreshing market and running trade monitor...');
+            var formData = new FormData();
+            var tokenInput = document.querySelector('input[name="csrf_token"]');
+            if (tokenInput) { formData.append('csrf_token', tokenInput.value); }
+            fetch('background-check.php', { method: 'POST', body: formData, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        }
+    }, 30000);
 
     if (useLivePriceBtn) {
         useLivePriceBtn.addEventListener('click', function () {
-            if (!calculatorEntryInput || !livePrice) {
-                setStatus('Load a valid live price first.', 'negative');
-                return;
-            }
+            if (!calculatorEntryInput || !livePrice) { setStatus('Load a valid live price first.', 'negative'); return; }
+            autoFillEnabled = true;
             calculatorEntryInput.value = livePrice.toFixed(8);
-            setStatus('Entry price was filled from live market data.', 'positive');
+            setStatus('Entry price filled and auto-fill enabled.', 'positive');
             window.location.hash = '#calculator';
         });
     }
