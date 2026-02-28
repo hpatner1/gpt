@@ -64,6 +64,7 @@ require __DIR__ . '/includes/header.php';
     <a class="active" href="#overview">Dashboard</a>
     <a href="#trades">Journal</a>
     <a href="#analytics">Analytics</a>
+    <a href="#psychology">Psychology</a>
     <a href="#market">Market</a>
 </section>
 
@@ -144,6 +145,37 @@ require __DIR__ . '/includes/header.php';
     <p id="advancedMetricsEmpty" class="muted" hidden>Advanced analytics will appear after you close some trades.</p>
 </section>
 
+
+<section class="card panel" id="psychology">
+    <h3>Psychology Insights</h3>
+    <div class="analytics-split-grid">
+        <article class="metric-card">
+            <h4>Emotion Performance Breakdown</h4>
+            <div class="table-wrap compact-table-wrap">
+                <table id="emotionPerformanceTable">
+                    <thead><tr><th>Emotion</th><th>Trades</th><th>Win Rate</th><th>Net Profit</th></tr></thead>
+                    <tbody><tr><td colspan="4">No emotion data yet.</td></tr></tbody>
+                </table>
+            </div>
+        </article>
+        <article class="metric-card">
+            <h4>Emotional Bias Detection</h4>
+            <p class="tiny muted">Most common pre-trade emotion before loss: <span id="emotionBeforeLoss">--</span></p>
+            <p class="tiny muted">Primary weakness pattern: <span id="emotionBiasPattern">--</span></p>
+            <p class="tiny muted">Best performing emotion: <span id="bestEmotionLabel">--</span></p>
+        </article>
+    </div>
+</section>
+
+<section class="card panel">
+    <h3>Performance Distribution Charts</h3>
+    <div class="analytics-split-grid">
+        <article class="metric-card"><h4>RR Distribution Histogram</h4><canvas id="rrDistributionChart"></canvas></article>
+        <article class="metric-card"><h4>Profit Distribution</h4><canvas id="profitDistributionChart"></canvas></article>
+        <article class="metric-card"><h4>Win/Loss Streaks</h4><canvas id="streakChart"></canvas></article>
+    </div>
+</section>
+
 <section class="card panel" id="riskIntelligencePanel">
     <h3>Risk Intelligence Panel</h3>
     <div id="riskIntelligenceList" class="risk-intel-list">
@@ -208,24 +240,25 @@ require __DIR__ . '/includes/header.php';
         <table>
             <thead>
             <tr>
-                <th>Date</th><th>Coin</th><th>Strategy</th><th>Session</th><th>Entry</th><th>SL</th><th>TP</th><th>RR</th><th>Status</th><th>Actions</th>
+                <th>Date</th><th>Coin</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>%@TP1</th><th>RR</th><th>Pre Emotion</th><th>Status</th><th>Actions</th>
             </tr>
             </thead>
             <tbody>
             <?php if (!$trades): ?>
-                <tr><td colspan="10">No trades found.</td></tr>
+                <tr><td colspan="11">No trades found.</td></tr>
             <?php else: ?>
                 <?php foreach ($trades as $trade): ?>
                     <tr>
                         <td><?php echo e($trade['trade_date']); ?></td>
                         <td><?php echo e($trade['coin_name']); ?></td>
-                        <td><?php echo e((string) ($trade['strategy'] ?: '-')); ?></td>
-                        <td><?php echo e((string) ($trade['session'] ?: '-')); ?></td>
                         <td><?php echo e($trade['entry_price']); ?></td>
                         <td><?php echo e($trade['stop_loss_price']); ?></td>
-                        <td><?php echo e($trade['take_profit_price']); ?></td>
+                        <td><?php echo e((string) ($trade['tp1_price'] ?: $trade['take_profit_price'])); ?></td>
+                        <td><?php echo e((string) ($trade['tp2_price'] ?: $trade['take_profit_price'])); ?></td>
+                        <td><?php echo e(number_format((float) ($trade['partial_close_percent'] ?? 0), 2)); ?>%</td>
                         <td><?php echo e(number_format((float) $trade['rr_ratio'], 2)); ?></td>
-                        <td><span class="badge <?php echo strtolower($trade['status']); ?>"><?php echo e($trade['status']); ?></span></td>
+                        <td><?php echo e((string) ($trade['pre_trade_emotion'] ?: '-')); ?></td>
+                        <td><span class="badge <?php echo strtolower(str_replace(' ', '-', $trade['status'])); ?>"><?php echo e($trade['status']); ?></span></td>
                         <td>
                             <a href="edit_trade.php?id=<?php echo e((string) $trade['id']); ?>">Edit</a>
                             |

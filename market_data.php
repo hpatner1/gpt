@@ -19,7 +19,7 @@ if (!is_dir($cacheDir)) {
 }
 
 $cacheFile = $cacheDir . '/market_' . $symbol . '.json';
-$cacheLifetime = 300;
+$cacheLifetime = 30;
 
 if (is_file($cacheFile) && (time() - filemtime($cacheFile) < $cacheLifetime)) {
     $cached = file_get_contents($cacheFile);
@@ -39,7 +39,7 @@ function fetch_market_payload(string $url): ?string
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 15,
             CURLOPT_CONNECTTIMEOUT => 8,
-            CURLOPT_USERAGENT => 'TradingSystem/2.4',
+            CURLOPT_USERAGENT => 'TradingSystem/2.5',
         ]);
         $body = curl_exec($ch);
         $statusCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -56,7 +56,7 @@ function fetch_market_payload(string $url): ?string
         'http' => [
             'method' => 'GET',
             'timeout' => 15,
-            'header' => "User-Agent: TradingSystem/2.4\r\n",
+            'header' => "User-Agent: TradingSystem/2.5\r\n",
         ],
     ]);
 

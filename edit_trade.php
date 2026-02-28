@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $status = $_POST['status'] ?? 'Running';
         $tradeDate = $_POST['trade_date'] ?? date('Y-m-d');
 
-        $allowedStatus = ['Win', 'Loss', 'Running'];
+        $allowedStatus = ['Win', 'Loss', 'Running', 'Partially Closed'];
         if ($coin === '' || strlen($coin) > 25) {
             $error = 'Coin name is required and must be less than 25 characters.';
         } elseif ($balance <= 0 || $riskPercent <= 0 || $entry <= 0 || $stopLoss <= 0 || $takeProfit <= 0) {
@@ -100,7 +100,7 @@ require __DIR__ . '/includes/header.php';
             <div><label>Take Profit Price</label><input type="number" step="0.00000001" name="take_profit_price" value="<?php echo e($trade['take_profit_price']); ?>" required></div>
             <div><label>Status</label>
                 <select name="status">
-                    <?php foreach (['Running', 'Win', 'Loss'] as $status): ?>
+                    <?php foreach (['Running', 'Partially Closed', 'Win', 'Loss'] as $status): ?>
                         <option value="<?php echo e($status); ?>" <?php echo $trade['status'] === $status ? 'selected' : ''; ?>><?php echo e($status); ?></option>
                     <?php endforeach; ?>
                 </select>
