@@ -103,3 +103,23 @@ th, td { padding: 10px; border-bottom: 1px solid var(--border); text-align: left
     .app-shell { flex-direction: column; }
     .sidebar { width: 100%; }
 }
+
+.equity-card {
+    background: linear-gradient(160deg, #121f36 0%, #0f1a2c 100%);
+}
+
+.equity-chart-wrap {
+    position: relative;
+    width: 100%;
+    min-height: 320px;
+    height: 40vh;
+    max-height: 460px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #0c1526;
+    padding: 12px;
+}
+
+.equity-empty {
+    margin-top: 10px;
+}

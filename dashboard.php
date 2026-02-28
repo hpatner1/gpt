@@ -84,6 +84,9 @@ $weeklyDrawdownPercent = $weeklyRisk > 0 && $weeklyPnl < 0 ? (abs($weeklyPnl) / 
 $weeklyDrawdownAlert = $weeklyDrawdownPercent > 5;
 
 $pageTitle = 'Dashboard - ' . APP_NAME;
+$extraHeadScripts = [
+    'https://cdn.jsdelivr.net/npm/chart.js',
+];
 require __DIR__ . '/includes/header.php';
 ?>
 <section>
@@ -97,6 +100,15 @@ require __DIR__ . '/includes/header.php';
     <?php if ($weeklyDrawdownAlert): ?>
         <div class="alert warning">Risk Alert: Weekly drawdown is <?php echo e(number_format($weeklyDrawdownPercent, 2)); ?>% (&gt;5%).</div>
     <?php endif; ?>
+
+    <section class="card panel equity-card">
+        <h3>Equity Curve</h3>
+        <p class="muted">Cumulative equity based on closed trades (Win/Loss).</p>
+        <div class="equity-chart-wrap">
+            <canvas id="equityCurveChart" aria-label="Equity Curve Chart"></canvas>
+        </div>
+        <p id="equityChartEmpty" class="muted equity-empty" hidden>No closed trades available to plot yet.</p>
+    </section>
 
     <div class="stats-grid">
         <article class="card"><h3>Total Trades</h3><p><?php echo e((string) $totalTrades); ?></p></article>
@@ -195,4 +207,101 @@ require __DIR__ . '/includes/header.php';
         </table>
     </div>
 </section>
+
+<script>
+(function () {
+    var chartCanvas = document.getElementById('equityCurveChart');
+    var emptyState = document.getElementById('equityChartEmpty');
+
+    if (!chartCanvas || typeof Chart === 'undefined') {
+        return;
+    }
+
+    fetch('equity_data.php', {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+        .then(function (response) {
+            if (!response.ok) {
+                throw new Error('Unable to load equity data.');
+            }
+
+            return response.json();
+        })
+        .then(function (data) {
+            if (!Array.isArray(data) || data.length === 0) {
+                if (emptyState) {
+                    emptyState.hidden = false;
+                }
+                return;
+            }
+
+            var labels = data.map(function (point) { return point.date; });
+            var values = data.map(function (point) { return point.equity; });
+
+            new Chart(chartCanvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Equity',
+                        data: values,
+                        borderColor: '#36d399',
+                        backgroundColor: 'rgba(54, 211, 153, 0.12)',
+                        borderWidth: 2,
+                        pointRadius: 2,
+                        pointHoverRadius: 4,
+                        tension: 0.35,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 850,
+                        easing: 'easeOutQuart'
+                    },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            enabled: true
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(152, 166, 192, 0.12)'
+                            },
+                            ticks: {
+                                color: '#c9d4ee'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(152, 166, 192, 0.12)'
+                            },
+                            ticks: {
+                                color: '#c9d4ee'
+                            }
+                        }
+                    }
+                }
+            });
+        })
+        .catch(function () {
+            if (emptyState) {
+                emptyState.hidden = false;
+                emptyState.textContent = 'Unable to load equity data right now.';
+            }
+        });
+})();
+</script>
 <?php require __DIR__ . '/includes/footer.php'; ?>
