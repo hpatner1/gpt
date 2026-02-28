@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($user && password_verify($password, $user['password_hash'])) {
                 session_regenerate_id(true);
                 $_SESSION['user_id'] = (int) $user['id'];
-                redirect('dashboard.php');
+                redirect('dashboard.php?toast=login_success');
             } else {
                 $error = 'Invalid login credentials.';
             }

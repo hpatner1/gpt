@@ -106,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'trade_date' => $tradeDate,
                 ]);
 
-                redirect('dashboard.php#trades');
+                redirect('dashboard.php?toast=trade_saved#trades');
             }
         }
     }

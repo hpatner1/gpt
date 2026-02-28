@@ -58,8 +58,17 @@ $consecutiveLossAlert = count($recentStatuses) === 3 && count(array_filter($rece
 
 $pageTitle = 'Dashboard - ' . APP_NAME;
 $extraHeadScripts = ['https://cdn.jsdelivr.net/npm/chart.js'];
+$toastKey = (string) ($_GET['toast'] ?? '');
+$toastMap = [
+    'login_success' => ['type' => 'success', 'message' => 'Welcome back! Login successful.'],
+    'trade_saved' => ['type' => 'success', 'message' => 'Trade saved successfully.'],
+    'trade_updated' => ['type' => 'success', 'message' => 'Trade updated successfully.'],
+    'trade_deleted' => ['type' => 'warning', 'message' => 'Trade deleted.'],
+    'trade_delete_error' => ['type' => 'error', 'message' => 'Unable to delete trade.'],
+];
 require __DIR__ . '/includes/header.php';
 ?>
+<?php if (isset($toastMap[$toastKey])): ?><div class="toast-bootstrap" data-toast-type="<?php echo e($toastMap[$toastKey]['type']); ?>" data-toast-message="<?php echo e($toastMap[$toastKey]['message']); ?>"></div><?php endif; ?>
 <section class="tabs-nav">
     <a class="active" href="#overview">Dashboard</a>
     <a href="#trades">Journal</a>
@@ -77,11 +86,11 @@ require __DIR__ . '/includes/header.php';
     <?php endif; ?>
 
     <div class="stats-grid">
-        <article class="card"><h3>Total Trades</h3><p><?php echo e((string) $totalTrades); ?></p></article>
-        <article class="card"><h3>Win Rate</h3><p><?php echo e(number_format($winRate, 2)); ?>%</p></article>
-        <article class="card"><h3>Average RR</h3><p><?php echo e(number_format($avgRR, 2)); ?></p></article>
-        <article class="card"><h3>Total P/L</h3><p class="<?php echo $totalPnL >= 0 ? 'positive' : 'negative'; ?>"><?php echo e(number_format($totalPnL, 2)); ?></p></article>
-        <article class="card"><h3>Account Growth</h3><p><?php echo e(number_format($accountGrowth, 2)); ?>%</p></article>
+        <article class="card stat-card"><h3>Account Balance</h3><p><?php echo e(number_format($totalRisked, 2)); ?></p></article>
+        <article class="card stat-card"><h3>Total Trades</h3><p><?php echo e((string) $totalTrades); ?></p></article>
+        <article class="card stat-card"><h3>Win Rate</h3><p><?php echo e(number_format($winRate, 2)); ?>%</p></article>
+        <article class="card stat-card"><h3>Current Drawdown</h3><p id="headerCurrentDrawdown">--</p></article>
+        <article class="card stat-card"><h3>Current Equity</h3><p id="headerCurrentEquity"><?php echo e(number_format($totalPnL, 2)); ?></p></article>
     </div>
 </section>
 
@@ -262,7 +271,7 @@ require __DIR__ . '/includes/header.php';
                         <td>
                             <a href="edit_trade.php?id=<?php echo e((string) $trade['id']); ?>">Edit</a>
                             |
-                            <a href="delete_trade.php?id=<?php echo e((string) $trade['id']); ?>&csrf_token=<?php echo e(csrf_token()); ?>" onclick="return confirm('Delete this trade?');">Delete</a>
+                            <a href="delete_trade.php?id=<?php echo e((string) $trade['id']); ?>&csrf_token=<?php echo e(csrf_token()); ?>" class="action-delete" data-confirm="Delete this trade?" data-confirm-title="Delete Trade">Delete</a>
                         </td>
                     </tr>
                 <?php endforeach; ?>
