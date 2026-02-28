@@ -123,3 +123,35 @@ th, td { padding: 10px; border-bottom: 1px solid var(--border); text-align: left
 .equity-empty {
     margin-top: 10px;
 }
+
+.advanced-metrics-panel {
+    background: linear-gradient(160deg, #121f36 0%, #0f1a2c 100%);
+}
+
+.advanced-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+}
+
+.metric-card {
+    background: #0c1526;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    box-shadow: 0 6px 18px rgba(7, 13, 25, 0.35);
+}
+
+.metric-card h4 {
+    margin: 0 0 8px;
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.metric-card p {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 700;
+}

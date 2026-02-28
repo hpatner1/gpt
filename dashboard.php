@@ -103,11 +103,27 @@ require __DIR__ . '/includes/header.php';
 
     <section class="card panel equity-card">
         <h3>Equity Curve</h3>
-        <p class="muted">Cumulative equity based on closed trades (Win/Loss).</p>
+        <p class="muted">Cumulative equity and baseline balance based on closed trades (Win/Loss).</p>
         <div class="equity-chart-wrap">
             <canvas id="equityCurveChart" aria-label="Equity Curve Chart"></canvas>
         </div>
         <p id="equityChartEmpty" class="muted equity-empty" hidden>No closed trades available to plot yet.</p>
+    </section>
+
+    <section class="card panel advanced-metrics-panel">
+        <div class="panel-head">
+            <h3>Advanced Performance Metrics</h3>
+        </div>
+        <div class="advanced-grid" id="advancedMetricsGrid">
+            <article class="metric-card"><h4>Max Drawdown %</h4><p id="metricMaxDrawdownPercent">--</p></article>
+            <article class="metric-card"><h4>Profit Factor</h4><p id="metricProfitFactor">--</p></article>
+            <article class="metric-card"><h4>Average Win</h4><p id="metricAvgWin">--</p></article>
+            <article class="metric-card"><h4>Average Loss</h4><p id="metricAvgLoss">--</p></article>
+            <article class="metric-card"><h4>Win/Loss Ratio</h4><p id="metricWinLossRatio">--</p></article>
+            <article class="metric-card"><h4>Total Net Profit</h4><p id="metricNetProfit">--</p></article>
+            <article class="metric-card"><h4>Total Closed Trades</h4><p id="metricClosedTrades">--</p></article>
+        </div>
+        <p id="advancedMetricsEmpty" class="muted" hidden>Advanced analytics will appear after you close some trades.</p>
     </section>
 
     <div class="stats-grid">
@@ -207,101 +223,4 @@ require __DIR__ . '/includes/header.php';
         </table>
     </div>
 </section>
-
-<script>
-(function () {
-    var chartCanvas = document.getElementById('equityCurveChart');
-    var emptyState = document.getElementById('equityChartEmpty');
-
-    if (!chartCanvas || typeof Chart === 'undefined') {
-        return;
-    }
-
-    fetch('equity_data.php', {
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-        .then(function (response) {
-            if (!response.ok) {
-                throw new Error('Unable to load equity data.');
-            }
-
-            return response.json();
-        })
-        .then(function (data) {
-            if (!Array.isArray(data) || data.length === 0) {
-                if (emptyState) {
-                    emptyState.hidden = false;
-                }
-                return;
-            }
-
-            var labels = data.map(function (point) { return point.date; });
-            var values = data.map(function (point) { return point.equity; });
-
-            new Chart(chartCanvas, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Equity',
-                        data: values,
-                        borderColor: '#36d399',
-                        backgroundColor: 'rgba(54, 211, 153, 0.12)',
-                        borderWidth: 2,
-                        pointRadius: 2,
-                        pointHoverRadius: 4,
-                        tension: 0.35,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: {
-                        duration: 850,
-                        easing: 'easeOutQuart'
-                    },
-                    interaction: {
-                        mode: 'index',
-                        intersect: false
-                    },
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            enabled: true
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: {
-                                color: 'rgba(152, 166, 192, 0.12)'
-                            },
-                            ticks: {
-                                color: '#c9d4ee'
-                            }
-                        },
-                        y: {
-                            grid: {
-                                color: 'rgba(152, 166, 192, 0.12)'
-                            },
-                            ticks: {
-                                color: '#c9d4ee'
-                            }
-                        }
-                    }
-                }
-            });
-        })
-        .catch(function () {
-            if (emptyState) {
-                emptyState.hidden = false;
-                emptyState.textContent = 'Unable to load equity data right now.';
-            }
-        });
-})();
-</script>
 <?php require __DIR__ . '/includes/footer.php'; ?>
