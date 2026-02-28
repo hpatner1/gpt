@@ -8,6 +8,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo e($pageTitle ?? APP_NAME); ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <?php if (!empty($extraHeadScripts) && is_array($extraHeadScripts)): ?>
+        <?php foreach ($extraHeadScripts as $scriptSrc): ?>
+            <script src="<?php echo e($scriptSrc); ?>"></script>
+        <?php endforeach; ?>
+    <?php endif; ?>
 </head>
 <body>
 <div class="app-shell">
