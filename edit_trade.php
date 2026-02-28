@@ -4,7 +4,7 @@ require_login();
 
 $tradeId = (int) ($_GET['id'] ?? $_POST['id'] ?? 0);
 if ($tradeId <= 0) {
-    redirect('dashboard.php#trades');
+    redirect('dashboard.php?toast=trade_updated#trades');
 }
 
 $stmt = $pdo->prepare('SELECT * FROM trades WHERE id = :id AND user_id = :user_id LIMIT 1');
@@ -12,7 +12,7 @@ $stmt->execute(['id' => $tradeId, 'user_id' => current_user_id()]);
 $trade = $stmt->fetch();
 
 if (!$trade) {
-    redirect('dashboard.php#trades');
+    redirect('dashboard.php?toast=trade_updated#trades');
 }
 
 $error = '';
@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'user_id' => current_user_id(),
             ]);
 
-            redirect('dashboard.php#trades');
+            redirect('dashboard.php?toast=trade_updated#trades');
         }
     }
 }

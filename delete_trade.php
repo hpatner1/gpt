@@ -5,12 +5,14 @@ require_login();
 $tradeId = (int) ($_GET['id'] ?? 0);
 $token = $_GET['csrf_token'] ?? '';
 
+$toast = 'trade_delete_error';
 if ($tradeId > 0 && verify_csrf($token)) {
     $stmt = $pdo->prepare('DELETE FROM trades WHERE id = :id AND user_id = :user_id');
     $stmt->execute([
         'id' => $tradeId,
         'user_id' => current_user_id(),
     ]);
+    $toast = $stmt->rowCount() > 0 ? 'trade_deleted' : 'trade_delete_error';
 }
 
-redirect('dashboard.php#trades');
+redirect('dashboard.php?toast=' . urlencode($toast) . '#trades');
