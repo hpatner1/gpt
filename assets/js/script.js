@@ -123,28 +123,11 @@
                             labels: {
                                 color: '#c9d4ee'
                             }
-                        },
-                        tooltip: {
-                            enabled: true
                         }
                     },
                     scales: {
-                        x: {
-                            grid: {
-                                color: 'rgba(152, 166, 192, 0.12)'
-                            },
-                            ticks: {
-                                color: '#c9d4ee'
-                            }
-                        },
-                        y: {
-                            grid: {
-                                color: 'rgba(152, 166, 192, 0.12)'
-                            },
-                            ticks: {
-                                color: '#c9d4ee'
-                            }
-                        }
+                        x: { ticks: { color: '#c9d4ee' }, grid: { color: 'rgba(152, 166, 192, 0.12)' } },
+                        y: { ticks: { color: '#c9d4ee' }, grid: { color: 'rgba(152, 166, 192, 0.12)' } }
                     }
                 }
             });
@@ -160,6 +143,8 @@
 (function () {
     var emptyState = document.getElementById('advancedMetricsEmpty');
     var grid = document.getElementById('advancedMetricsGrid');
+    var ruinGaugeBar = document.getElementById('ruinGaugeBar');
+    var metricRiskOfRuin = document.getElementById('metricRiskOfRuin');
 
     if (!grid) {
         return;
@@ -172,7 +157,9 @@
         avgLoss: document.getElementById('metricAvgLoss'),
         winLossRatio: document.getElementById('metricWinLossRatio'),
         netProfit: document.getElementById('metricNetProfit'),
-        closedTrades: document.getElementById('metricClosedTrades')
+        closedTrades: document.getElementById('metricClosedTrades'),
+        expectancyPerTrade: document.getElementById('metricExpectancyPerTrade'),
+        expectancyPercent: document.getElementById('metricExpectancyPercent')
     };
 
     function formatMoney(value) {
@@ -186,11 +173,20 @@
         return Number(value).toFixed(2);
     }
 
-    fetch('analytics_data.php', {
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest'
+    function applyPositiveNegative(el, value) {
+        if (!el) {
+            return;
         }
-    })
+        if (Number(value) >= 0) {
+            el.classList.add('positive');
+            el.classList.remove('negative');
+        } else {
+            el.classList.add('negative');
+            el.classList.remove('positive');
+        }
+    }
+
+    fetch('analytics_data.php', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function (response) {
             if (!response.ok) {
                 throw new Error('Unable to load analytics.');
@@ -212,13 +208,18 @@
             metricEls.winLossRatio.textContent = formatRatio(data.win_loss_ratio);
             metricEls.netProfit.textContent = formatMoney(data.net_profit || 0);
             metricEls.closedTrades.textContent = String(data.closed_trades || 0);
+            metricEls.expectancyPerTrade.textContent = formatMoney(data.expectancy_per_trade || 0);
+            metricEls.expectancyPercent.textContent = Number(data.expectancy_percent_risk || 0).toFixed(2) + '%';
+            metricRiskOfRuin.textContent = Number(data.risk_of_ruin_percent || 0).toFixed(2) + '%';
 
-            if (Number(data.net_profit || 0) >= 0) {
-                metricEls.netProfit.classList.add('positive');
-                metricEls.netProfit.classList.remove('negative');
-            } else {
-                metricEls.netProfit.classList.add('negative');
-                metricEls.netProfit.classList.remove('positive');
+            applyPositiveNegative(metricEls.netProfit, data.net_profit || 0);
+            applyPositiveNegative(metricEls.expectancyPerTrade, data.expectancy_per_trade || 0);
+            applyPositiveNegative(metricEls.expectancyPercent, data.expectancy_percent_risk || 0);
+
+            if (ruinGaugeBar) {
+                var ruin = Math.min(100, Math.max(0, Number(data.risk_of_ruin_percent || 0)));
+                ruinGaugeBar.style.width = ruin + '%';
+                ruinGaugeBar.classList.toggle('danger', ruin > 50);
             }
         })
         .catch(function () {
@@ -226,5 +227,33 @@
                 emptyState.hidden = false;
                 emptyState.textContent = 'Unable to load advanced analytics right now.';
             }
+        });
+})();
+
+(function () {
+    var container = document.getElementById('riskIntelligenceList');
+    if (!container) {
+        return;
+    }
+
+    fetch('risk_intelligence.php', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (response) {
+            if (!response.ok) {
+                throw new Error('Unable to load risk suggestions.');
+            }
+            return response.json();
+        })
+        .then(function (data) {
+            if (!data || !Array.isArray(data.suggestions)) {
+                container.innerHTML = '<p class="muted">No intelligence suggestions available.</p>';
+                return;
+            }
+
+            container.innerHTML = data.suggestions.map(function (item) {
+                return '<div class="risk-note ' + item.level + '">' + item.message + '</div>';
+            }).join('');
+        })
+        .catch(function () {
+            container.innerHTML = '<p class="muted">Unable to load suggestions right now.</p>';
         });
 })();

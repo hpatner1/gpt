@@ -51,45 +51,23 @@ $totalPnL = (float) ($stats['total_pnl'] ?? 0);
 $totalRisked = (float) ($stats['total_risked'] ?? 0);
 $accountGrowth = $totalRisked > 0 ? ($totalPnL / $totalRisked) * 100 : 0;
 
-$monthlyStmt = $pdo->prepare(
-    'SELECT DATE_FORMAT(trade_date, "%Y-%m") AS month,
-            COUNT(*) AS trades,
-            SUM(CASE WHEN status = "Win" THEN potential_profit WHEN status = "Loss" THEN -potential_loss ELSE 0 END) AS pnl
-     FROM trades
-     WHERE user_id = :user_id
-     GROUP BY DATE_FORMAT(trade_date, "%Y-%m")
-     ORDER BY month DESC
-     LIMIT 6'
-);
-$monthlyStmt->execute(['user_id' => $userId]);
-$monthlyRows = $monthlyStmt->fetchAll();
-
 $lossAlertStmt = $pdo->prepare('SELECT status FROM trades WHERE user_id = :user_id ORDER BY trade_date DESC, id DESC LIMIT 3');
 $lossAlertStmt->execute(['user_id' => $userId]);
 $recentStatuses = $lossAlertStmt->fetchAll(PDO::FETCH_COLUMN);
 $consecutiveLossAlert = count($recentStatuses) === 3 && count(array_filter($recentStatuses, fn($s) => $s === 'Loss')) === 3;
 
-$drawdownStmt = $pdo->prepare(
-    'SELECT SUM(CASE WHEN status = "Win" THEN potential_profit WHEN status = "Loss" THEN -potential_loss ELSE 0 END) AS weekly_pnl,
-            SUM(potential_loss) AS weekly_risk
-     FROM trades
-     WHERE user_id = :user_id
-       AND trade_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)'
-);
-$drawdownStmt->execute(['user_id' => $userId]);
-$drawdown = $drawdownStmt->fetch();
-$weeklyPnl = (float) ($drawdown['weekly_pnl'] ?? 0);
-$weeklyRisk = (float) ($drawdown['weekly_risk'] ?? 0);
-$weeklyDrawdownPercent = $weeklyRisk > 0 && $weeklyPnl < 0 ? (abs($weeklyPnl) / $weeklyRisk) * 100 : 0;
-$weeklyDrawdownAlert = $weeklyDrawdownPercent > 5;
-
 $pageTitle = 'Dashboard - ' . APP_NAME;
-$extraHeadScripts = [
-    'https://cdn.jsdelivr.net/npm/chart.js',
-];
+$extraHeadScripts = ['https://cdn.jsdelivr.net/npm/chart.js'];
 require __DIR__ . '/includes/header.php';
 ?>
-<section>
+<section class="tabs-nav">
+    <a class="active" href="#overview">Dashboard</a>
+    <a href="#trades">Journal</a>
+    <a href="#analytics">Analytics</a>
+    <a href="reports.php">Reports</a>
+</section>
+
+<section id="overview">
     <h2>Dashboard</h2>
     <p class="muted">Welcome to your spot trading risk control center.</p>
 
@@ -97,41 +75,51 @@ require __DIR__ . '/includes/header.php';
         <div class="alert warning">Risk Alert: You have 3 consecutive losses. Consider reducing risk exposure.</div>
     <?php endif; ?>
 
-    <?php if ($weeklyDrawdownAlert): ?>
-        <div class="alert warning">Risk Alert: Weekly drawdown is <?php echo e(number_format($weeklyDrawdownPercent, 2)); ?>% (&gt;5%).</div>
-    <?php endif; ?>
-
-    <section class="card panel equity-card">
-        <h3>Equity Curve</h3>
-        <p class="muted">Cumulative equity and baseline balance based on closed trades (Win/Loss).</p>
-        <div class="equity-chart-wrap">
-            <canvas id="equityCurveChart" aria-label="Equity Curve Chart"></canvas>
-        </div>
-        <p id="equityChartEmpty" class="muted equity-empty" hidden>No closed trades available to plot yet.</p>
-    </section>
-
-    <section class="card panel advanced-metrics-panel">
-        <div class="panel-head">
-            <h3>Advanced Performance Metrics</h3>
-        </div>
-        <div class="advanced-grid" id="advancedMetricsGrid">
-            <article class="metric-card"><h4>Max Drawdown %</h4><p id="metricMaxDrawdownPercent">--</p></article>
-            <article class="metric-card"><h4>Profit Factor</h4><p id="metricProfitFactor">--</p></article>
-            <article class="metric-card"><h4>Average Win</h4><p id="metricAvgWin">--</p></article>
-            <article class="metric-card"><h4>Average Loss</h4><p id="metricAvgLoss">--</p></article>
-            <article class="metric-card"><h4>Win/Loss Ratio</h4><p id="metricWinLossRatio">--</p></article>
-            <article class="metric-card"><h4>Total Net Profit</h4><p id="metricNetProfit">--</p></article>
-            <article class="metric-card"><h4>Total Closed Trades</h4><p id="metricClosedTrades">--</p></article>
-        </div>
-        <p id="advancedMetricsEmpty" class="muted" hidden>Advanced analytics will appear after you close some trades.</p>
-    </section>
-
     <div class="stats-grid">
         <article class="card"><h3>Total Trades</h3><p><?php echo e((string) $totalTrades); ?></p></article>
         <article class="card"><h3>Win Rate</h3><p><?php echo e(number_format($winRate, 2)); ?>%</p></article>
         <article class="card"><h3>Average RR</h3><p><?php echo e(number_format($avgRR, 2)); ?></p></article>
         <article class="card"><h3>Total P/L</h3><p class="<?php echo $totalPnL >= 0 ? 'positive' : 'negative'; ?>"><?php echo e(number_format($totalPnL, 2)); ?></p></article>
         <article class="card"><h3>Account Growth</h3><p><?php echo e(number_format($accountGrowth, 2)); ?>%</p></article>
+    </div>
+</section>
+
+<section class="card panel equity-card">
+    <h3>Equity Curve</h3>
+    <div class="equity-chart-wrap">
+        <canvas id="equityCurveChart" aria-label="Equity Curve Chart"></canvas>
+    </div>
+    <p id="equityChartEmpty" class="muted equity-empty" hidden>No closed trades available to plot yet.</p>
+</section>
+
+<section class="card panel advanced-metrics-panel" id="analytics">
+    <div class="panel-head">
+        <h3>Advanced Performance Metrics</h3>
+    </div>
+    <div class="advanced-grid" id="advancedMetricsGrid">
+        <article class="metric-card"><h4>Max Drawdown %</h4><p id="metricMaxDrawdownPercent">--</p></article>
+        <article class="metric-card"><h4>Profit Factor</h4><p id="metricProfitFactor">--</p></article>
+        <article class="metric-card"><h4>Average Win</h4><p id="metricAvgWin">--</p></article>
+        <article class="metric-card"><h4>Average Loss</h4><p id="metricAvgLoss">--</p></article>
+        <article class="metric-card"><h4>Win/Loss Ratio</h4><p id="metricWinLossRatio">--</p></article>
+        <article class="metric-card"><h4>Total Net Profit</h4><p id="metricNetProfit">--</p></article>
+        <article class="metric-card"><h4>Total Closed Trades</h4><p id="metricClosedTrades">--</p></article>
+        <article class="metric-card"><h4>Expectancy / Trade</h4><p id="metricExpectancyPerTrade">--</p></article>
+        <article class="metric-card"><h4>Expectancy % (Risk)</h4><p id="metricExpectancyPercent">--</p></article>
+    </div>
+
+    <div class="risk-ruin-box">
+        <h4>Risk of Ruin</h4>
+        <p id="metricRiskOfRuin">--%</p>
+        <div class="ruin-gauge"><span id="ruinGaugeBar"></span></div>
+    </div>
+    <p id="advancedMetricsEmpty" class="muted" hidden>Advanced analytics will appear after you close some trades.</p>
+</section>
+
+<section class="card panel" id="riskIntelligencePanel">
+    <h3>Risk Intelligence Panel</h3>
+    <div id="riskIntelligenceList" class="risk-intel-list">
+        <p class="muted">Loading smart suggestions...</p>
     </div>
 </section>
 
@@ -154,8 +142,11 @@ require __DIR__ . '/includes/header.php';
 
 <section id="trades" class="card panel">
     <div class="panel-head">
-        <h3>Trade Management</h3>
-        <a class="btn-link" href="save_trade.php">+ Save Trade</a>
+        <h3>Trade Journal</h3>
+        <div class="panel-actions">
+            <a class="btn-link" href="save_trade.php">+ Save Trade</a>
+            <a class="btn-link" href="export_csv.php?csrf_token=<?php echo e(csrf_token()); ?>">Export Trade History</a>
+        </div>
     </div>
 
     <form method="GET" class="search-form">
@@ -166,31 +157,31 @@ require __DIR__ . '/includes/header.php';
     <div class="table-wrap">
         <table>
             <thead>
-                <tr>
-                    <th>Date</th><th>Coin</th><th>Entry</th><th>SL</th><th>TP</th><th>RR</th><th>Status</th><th>Actions</th>
-                </tr>
+            <tr>
+                <th>Date</th><th>Coin</th><th>Entry</th><th>SL</th><th>TP</th><th>RR</th><th>Status</th><th>Actions</th>
+            </tr>
             </thead>
             <tbody>
-                <?php if (!$trades): ?>
-                    <tr><td colspan="8">No trades found.</td></tr>
-                <?php else: ?>
-                    <?php foreach ($trades as $trade): ?>
-                        <tr>
-                            <td><?php echo e($trade['trade_date']); ?></td>
-                            <td><?php echo e($trade['coin_name']); ?></td>
-                            <td><?php echo e($trade['entry_price']); ?></td>
-                            <td><?php echo e($trade['stop_loss_price']); ?></td>
-                            <td><?php echo e($trade['take_profit_price']); ?></td>
-                            <td><?php echo e(number_format((float) $trade['rr_ratio'], 2)); ?></td>
-                            <td><span class="badge <?php echo strtolower($trade['status']); ?>"><?php echo e($trade['status']); ?></span></td>
-                            <td>
-                                <a href="edit_trade.php?id=<?php echo e((string) $trade['id']); ?>">Edit</a>
-                                |
-                                <a href="delete_trade.php?id=<?php echo e((string) $trade['id']); ?>&csrf_token=<?php echo e(csrf_token()); ?>" onclick="return confirm('Delete this trade?');">Delete</a>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
+            <?php if (!$trades): ?>
+                <tr><td colspan="8">No trades found.</td></tr>
+            <?php else: ?>
+                <?php foreach ($trades as $trade): ?>
+                    <tr>
+                        <td><?php echo e($trade['trade_date']); ?></td>
+                        <td><?php echo e($trade['coin_name']); ?></td>
+                        <td><?php echo e($trade['entry_price']); ?></td>
+                        <td><?php echo e($trade['stop_loss_price']); ?></td>
+                        <td><?php echo e($trade['take_profit_price']); ?></td>
+                        <td><?php echo e(number_format((float) $trade['rr_ratio'], 2)); ?></td>
+                        <td><span class="badge <?php echo strtolower($trade['status']); ?>"><?php echo e($trade['status']); ?></span></td>
+                        <td>
+                            <a href="edit_trade.php?id=<?php echo e((string) $trade['id']); ?>">Edit</a>
+                            |
+                            <a href="delete_trade.php?id=<?php echo e((string) $trade['id']); ?>&csrf_token=<?php echo e(csrf_token()); ?>" onclick="return confirm('Delete this trade?');">Delete</a>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            <?php endif; ?>
             </tbody>
         </table>
     </div>
@@ -199,28 +190,6 @@ require __DIR__ . '/includes/header.php';
         <?php for ($i = 1; $i <= $totalPages; $i++): ?>
             <a class="<?php echo $i === $page ? 'active' : ''; ?>" href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>#trades"><?php echo $i; ?></a>
         <?php endfor; ?>
-    </div>
-</section>
-
-<section class="card panel">
-    <h3>Monthly Performance (last 6 months)</h3>
-    <div class="table-wrap">
-        <table>
-            <thead><tr><th>Month</th><th>Trades</th><th>P/L</th></tr></thead>
-            <tbody>
-            <?php if (!$monthlyRows): ?>
-                <tr><td colspan="3">No monthly history yet.</td></tr>
-            <?php else: ?>
-                <?php foreach ($monthlyRows as $row): ?>
-                    <tr>
-                        <td><?php echo e($row['month']); ?></td>
-                        <td><?php echo e((string) $row['trades']); ?></td>
-                        <td class="<?php echo ((float) $row['pnl']) >= 0 ? 'positive' : 'negative'; ?>"><?php echo e(number_format((float) $row['pnl'], 2)); ?></td>
-                    </tr>
-                <?php endforeach; ?>
-            <?php endif; ?>
-            </tbody>
-        </table>
     </div>
 </section>
 <?php require __DIR__ . '/includes/footer.php'; ?>

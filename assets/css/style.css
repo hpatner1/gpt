@@ -155,3 +155,137 @@ th, td { padding: 10px; border-bottom: 1px solid var(--border); text-align: left
     font-size: 1.3rem;
     font-weight: 700;
 }
+
+.tabs-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.tabs-nav a {
+    padding: 10px 14px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: #0f1a30;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.tabs-nav a:hover,
+.tabs-nav a.active {
+    background: #183057;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25);
+}
+
+.card {
+    transition: transform 0.24s ease, border-color 0.24s ease;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+    border-color: #2f4672;
+}
+
+.panel-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ruin-gauge {
+    width: 100%;
+    height: 12px;
+    border-radius: 999px;
+    background: #1a2742;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.ruin-gauge span {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #36d399, #f3c969);
+    transition: width 0.35s ease;
+}
+
+.ruin-gauge span.danger {
+    background: linear-gradient(90deg, #f3c969, #ff5c7c);
+}
+
+.risk-ruin-box {
+    margin-top: 14px;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #0c1526;
+}
+
+.risk-intel-list {
+    display: grid;
+    gap: 10px;
+}
+
+.risk-note {
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #0d1729;
+}
+
+.risk-note.warning,
+.risk-note.caution {
+    border-color: #756832;
+    color: #ffe69a;
+}
+
+.risk-note.healthy {
+    border-color: #2b7a57;
+    color: #9ff0ca;
+}
+
+.heatmap-grid {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(90px, 1fr));
+    gap: 8px;
+}
+
+.heatmap-head {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.heatmap-day {
+    min-height: 72px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #15213a;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.heatmap-day span {
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+
+.heatmap-day.profit { background: rgba(54, 211, 153, 0.18); }
+.heatmap-day.loss { background: rgba(255, 92, 124, 0.2); }
+.heatmap-day.neutral { background: #101a2e; }
+.heatmap-day.empty { opacity: 0; pointer-events: none; }
+
+.month-picker {
+    grid-template-columns: 1fr auto;
+    align-items: end;
+}
+
+@media (max-width: 900px) {
+    .heatmap-grid {
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+    }
+}

@@ -23,9 +23,11 @@
                 <p class="muted">Spot Trading Dashboard</p>
             </div>
             <nav>
-                <a href="dashboard.php">Dashboard</a>
+                <a href="dashboard.php#overview">Dashboard</a>
+                <a href="dashboard.php#trades">Journal</a>
+                <a href="dashboard.php#analytics">Analytics</a>
+                <a href="reports.php">Reports</a>
                 <a href="dashboard.php#calculator">Risk Calculator</a>
-                <a href="dashboard.php#trades">Trade Journal</a>
                 <a href="logout.php">Logout</a>
             </nav>
         </aside>
