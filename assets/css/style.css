@@ -289,3 +289,48 @@ th, td { padding: 10px; border-bottom: 1px solid var(--border); text-align: left
         grid-template-columns: repeat(2, minmax(120px, 1fr));
     }
 }
+
+.analytics-split-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.compact-table-wrap table th,
+.compact-table-wrap table td {
+    font-size: 0.85rem;
+    padding: 8px;
+}
+
+.tiny {
+    font-size: 0.85rem;
+    margin: 0 0 10px;
+}
+
+.market-panel {
+    background: linear-gradient(160deg, #101a2f 0%, #0e1628 100%);
+}
+
+.market-search-form {
+    margin-bottom: 14px;
+}
+
+.market-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.market-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-top: 12px;
+}
+
+.market-actions button {
+    width: auto;
+    padding: 10px 16px;
+}
