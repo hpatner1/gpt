@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tp1 = (float) ($_POST['tp1_price'] ?? 0);
         $tp2 = (float) ($_POST['tp2_price'] ?? 0);
         $partialClosePercent = (float) ($_POST['partial_close_percent'] ?? 0);
-        $status = (string) ($_POST['status'] ?? 'Running');
+        $status = normalize_trade_status((string) ($_POST['status'] ?? 'Running'));
         $tradeDate = (string) ($_POST['trade_date'] ?? date('Y-m-d'));
         $strategy = trim((string) ($_POST['strategy'] ?? ''));
         $setupType = trim((string) ($_POST['setup_type'] ?? ''));
@@ -40,6 +40,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'TP1 price is required and must be greater than zero.';
         } elseif ($tp2 < 0) {
             $error = 'TP2 cannot be negative.';
+        } elseif ($entry === $stopLoss) {
+            $error = 'Entry and stop loss cannot be the same.';
+        } elseif ($tp1 === $entry) {
+            $error = 'TP1 cannot be the same as entry.';
         } elseif ($partialClosePercent < 0 || $partialClosePercent > 100) {
             $error = 'Partial close percentage must be between 0 and 100.';
         } elseif (!in_array($status, $allowedStatus, true)) {
@@ -62,9 +66,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Invalid trade date format.';
             } else {
                 $tp2Final = $tp2 > 0 ? $tp2 : $takeProfit;
-                $calculated = calculate_trade_metrics($balance, $riskPercent, $entry, $stopLoss, $takeProfit, $tp1, $tp2Final, $partialClosePercent);
+                $isLong = $stopLoss < $entry;
+                if (($isLong && ($tp1 <= $entry || $tp2Final <= $entry)) || (!$isLong && ($tp1 >= $entry || $tp2Final >= $entry))) {
+                    $error = 'TP values must be on the profit side of the entry price.';
+                }
 
-                $stmt = $pdo->prepare(
+                if ($error === '') {
+                    $calculated = calculate_trade_metrics($balance, $riskPercent, $entry, $stopLoss, $takeProfit, $tp1, $tp2Final, $partialClosePercent);
+
+                    $stmt = $pdo->prepare(
                     'INSERT INTO trades (
                         user_id, coin_name, account_balance, risk_percent, entry_price, stop_loss_price, take_profit_price,
                         tp1_price, tp2_price, partial_close_percent, remaining_close_percent, tp1_profit, tp2_profit,
@@ -77,8 +87,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         :session, :pre_trade_emotion, :post_trade_emotion, :trade_notes, :trade_date, NOW(), NOW()
                     )'
                 );
-                $stmt->execute([
-                    'user_id' => current_user_id(),
+                    $stmt->execute([
+                        'user_id' => current_user_id(),
                     'coin_name' => $coin,
                     'account_balance' => $balance,
                     'risk_percent' => $riskPercent,
@@ -104,9 +114,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'post_trade_emotion' => $postEmotion !== '' ? $postEmotion : null,
                     'trade_notes' => $tradeNotes !== '' ? $tradeNotes : null,
                     'trade_date' => $tradeDate,
-                ]);
+                    ]);
 
-                redirect('dashboard.php?toast=trade_saved#trades');
+                    redirect('dashboard.php?toast=trade_saved#trades');
+                }
             }
         }
     }

@@ -17,48 +17,101 @@ if (!verify_csrf($_POST['csrf_token'] ?? null)) {
 }
 
 $userId = current_user_id();
-$tradesStmt = $pdo->prepare('SELECT id, coin_name, stop_loss_price, tp1_price, tp2_price, take_profit_price FROM trades WHERE user_id = :user_id AND status = "Running" ORDER BY id DESC LIMIT 30');
+$tradesStmt = $pdo->prepare(
+    'SELECT id, coin_name, stop_loss_price, tp1_price, tp2_price, take_profit_price, entry_price, status
+     FROM trades
+     WHERE user_id = :user_id
+       AND status IN ("Running", "Partially Closed")
+     ORDER BY id DESC
+     LIMIT 30'
+);
 $tradesStmt->execute(['user_id' => $userId]);
 $trades = $tradesStmt->fetchAll();
 
-$updated = [];
+$symbolToTradeIds = [];
+$tradeIndex = [];
 foreach ($trades as $trade) {
     $symbol = strtolower(preg_replace('/[^a-z0-9]/', '', (string) $trade['coin_name']));
     if ($symbol === '') {
         continue;
     }
+    $symbolToTradeIds[$symbol][] = (int) $trade['id'];
+    $tradeIndex[(int) $trade['id']] = $trade;
+}
 
-    $context = stream_context_create(['http' => ['method' => 'GET', 'timeout' => 10, 'header' => "User-Agent: TradingSystem/2.5\r\n"]]);
-    $url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&symbols=' . urlencode($symbol);
-    $body = @file_get_contents($url, false, $context);
-    if ($body === false) {
+if (!$symbolToTradeIds) {
+    echo json_encode(['updated' => []], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$symbols = array_keys($symbolToTradeIds);
+$url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&symbols=' . urlencode(implode(',', $symbols));
+$context = stream_context_create(['http' => ['method' => 'GET', 'timeout' => 10, 'header' => "User-Agent: TradingSystem/2.5\r\n"]]);
+$body = @file_get_contents($url, false, $context);
+
+if ($body === false) {
+    http_response_code(502);
+    echo json_encode(['updated' => [], 'error' => 'Market provider is unavailable right now.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$decoded = json_decode($body, true);
+if (!is_array($decoded)) {
+    http_response_code(502);
+    echo json_encode(['updated' => [], 'error' => 'Invalid market response.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$priceBySymbol = [];
+foreach ($decoded as $coin) {
+    if (!is_array($coin) || !isset($coin['symbol'], $coin['current_price'])) {
+        continue;
+    }
+    $priceBySymbol[strtolower((string) $coin['symbol'])] = (float) $coin['current_price'];
+}
+
+$allowedTransitions = [
+    'Running' => ['Partially Closed', 'Win', 'Loss'],
+    'Partially Closed' => ['Win', 'Loss'],
+];
+
+$updated = [];
+$update = $pdo->prepare('UPDATE trades SET status = :status, updated_at = NOW() WHERE id = :id AND user_id = :user_id AND status = :current_status');
+
+foreach ($symbolToTradeIds as $symbol => $tradeIds) {
+    if (!isset($priceBySymbol[$symbol])) {
         continue;
     }
 
-    $decoded = json_decode($body, true);
-    if (!is_array($decoded) || !isset($decoded[0]['current_price'])) {
-        continue;
-    }
+    $price = $priceBySymbol[$symbol];
+    foreach ($tradeIds as $tradeId) {
+        $trade = $tradeIndex[$tradeId];
+        $currentStatus = normalize_trade_status((string) $trade['status']);
+        $tp1 = (float) ($trade['tp1_price'] ?: $trade['take_profit_price']);
+        $tp2 = (float) ($trade['tp2_price'] ?: $trade['take_profit_price']);
 
-    $price = (float) $decoded[0]['current_price'];
-    $sl = (float) $trade['stop_loss_price'];
-    $tp1 = (float) ($trade['tp1_price'] ?: $trade['take_profit_price']);
-    $tp2 = (float) ($trade['tp2_price'] ?: $trade['take_profit_price']);
+        $nextStatus = resolve_trade_status(
+            (float) $trade['entry_price'],
+            (float) $trade['stop_loss_price'],
+            $tp1,
+            $tp2,
+            $price,
+            $currentStatus
+        );
 
-    $nextStatus = 'Running';
-    if ($price <= $sl) {
-        $nextStatus = 'Loss';
-    } elseif ($price >= $tp2) {
-        $nextStatus = 'Win';
-    } elseif ($price >= $tp1) {
-        $nextStatus = 'Partially Closed';
-    }
+        if ($nextStatus === $currentStatus || !in_array($nextStatus, $allowedTransitions[$currentStatus] ?? [], true)) {
+            continue;
+        }
 
-    if ($nextStatus !== 'Running') {
-        $update = $pdo->prepare('UPDATE trades SET status = :status, updated_at = NOW() WHERE id = :id AND user_id = :user_id AND status = "Running"');
-        $update->execute(['status' => $nextStatus, 'id' => (int) $trade['id'], 'user_id' => $userId]);
+        $update->execute([
+            'status' => $nextStatus,
+            'id' => $tradeId,
+            'user_id' => $userId,
+            'current_status' => $currentStatus,
+        ]);
+
         if ($update->rowCount() > 0) {
-            $updated[] = ['id' => (int) $trade['id'], 'status' => $nextStatus, 'price' => $price];
+            $updated[] = ['id' => $tradeId, 'status' => $nextStatus, 'price' => $price];
         }
     }
 }
