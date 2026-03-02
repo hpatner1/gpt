@@ -20,11 +20,12 @@ if (!is_dir($cacheDir)) {
 
 $cacheFile = $cacheDir . '/market_' . $symbol . '.json';
 $cacheLifetime = 30;
+$cachedPayload = null;
 
-if (is_file($cacheFile) && (time() - filemtime($cacheFile) < $cacheLifetime)) {
-    $cached = file_get_contents($cacheFile);
-    if ($cached !== false) {
-        echo $cached;
+if (is_file($cacheFile)) {
+    $cachedPayload = file_get_contents($cacheFile);
+    if ($cachedPayload !== false && (time() - (int) filemtime($cacheFile) < $cacheLifetime)) {
+        echo $cachedPayload;
         exit;
     }
 }
@@ -65,6 +66,11 @@ function fetch_market_payload(string $url): ?string
 }
 
 $body = fetch_market_payload($url);
+if ($body === null && $cachedPayload !== false && $cachedPayload !== null) {
+    echo $cachedPayload;
+    exit;
+}
+
 if ($body === null) {
     http_response_code(502);
     echo json_encode(['error' => 'Market provider is unavailable right now.'], JSON_UNESCAPED_UNICODE);
@@ -73,6 +79,10 @@ if ($body === null) {
 
 $decoded = json_decode($body, true);
 if (!is_array($decoded) || empty($decoded[0])) {
+    if ($cachedPayload !== false && $cachedPayload !== null) {
+        echo $cachedPayload;
+        exit;
+    }
     http_response_code(404);
     echo json_encode(['error' => 'No market data found for that symbol.'], JSON_UNESCAPED_UNICODE);
     exit;

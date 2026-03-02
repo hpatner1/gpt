@@ -1,4 +1,9 @@
 (function () {
+    if (window.__tradingAppInit) { return; }
+    window.__tradingAppInit = true;
+    window.__tradingIntervals = window.__tradingIntervals || {};
+    window.__tradingCharts = window.__tradingCharts || {};
+
     var toastContainer = document.getElementById('toastContainer');
 
     window.showToast = function (type, message) {
@@ -43,7 +48,8 @@
             .catch(function () { btcEl.textContent = 'N/A'; showToast('error', 'API error while loading live BTC price.'); });
     }
     loadBtc();
-    setInterval(loadBtc, 30000);
+    if (window.__tradingIntervals.btc) { clearInterval(window.__tradingIntervals.btc); }
+    window.__tradingIntervals.btc = setInterval(loadBtc, 30000);
 })();
 
 (function () {
@@ -150,7 +156,8 @@
         .then(function (data) {
             skeleton.remove();
             if (!Array.isArray(data) || data.length === 0) { if (emptyState) { emptyState.hidden = false; } return; }
-            new Chart(chartCanvas, { type: 'line', data: { labels: data.map(function (i) { return i.date; }), datasets: [{ label: 'Equity', data: data.map(function (i) { return i.equity; }), borderColor: '#31d49f', backgroundColor: 'rgba(49,212,159,.15)', fill: true, tension: .35 }] }, options: { responsive: true, maintainAspectRatio: false } });
+            if (window.__tradingCharts.equity) { window.__tradingCharts.equity.destroy(); }
+            window.__tradingCharts.equity = new Chart(chartCanvas, { type: 'line', data: { labels: data.map(function (i) { return i.date; }), datasets: [{ label: 'Equity', data: data.map(function (i) { return i.equity; }), borderColor: '#31d49f', backgroundColor: 'rgba(49,212,159,.15)', fill: true, tension: .35 }] }, options: { responsive: true, maintainAspectRatio: false } });
         })
         .catch(function () { skeleton.remove(); if (emptyState) { emptyState.hidden = false; emptyState.textContent = 'Unable to load chart right now.'; } showToast('error', 'API error while loading equity chart.'); });
 })();
@@ -217,7 +224,8 @@
     }
 
     marketForm.addEventListener('submit', function (event) { event.preventDefault(); var symbol = symbolInput.value.trim().toLowerCase(); if (!symbol) { showToast('warning', 'Validation error: symbol is required.'); return; } fetchMarket(symbol, 'Loading...'); });
-    setInterval(function () { if (currentSymbol) { fetchMarket(currentSymbol, 'Auto-refreshing...'); } }, 30000);
+    if (window.__tradingIntervals.market) { clearInterval(window.__tradingIntervals.market); }
+    window.__tradingIntervals.market = setInterval(function () { if (currentSymbol) { fetchMarket(currentSymbol, 'Auto-refreshing...'); } }, 30000);
 
     if (useLivePriceBtn) {
         useLivePriceBtn.addEventListener('click', function () {

@@ -131,3 +131,47 @@ function calculate_risk_metrics(float $balance, float $riskPercent, float $entry
 {
     return calculate_trade_metrics($balance, $riskPercent, $entry, $stopLoss, $takeProfit);
 }
+
+
+function normalize_trade_status(string $status): string
+{
+    $normalized = strtolower(trim($status));
+    return match ($normalized) {
+        'running' => 'Running',
+        'partial', 'partially closed' => 'Partially Closed',
+        'win' => 'Win',
+        'loss' => 'Loss',
+        default => 'Running',
+    };
+}
+
+function resolve_trade_status(float $entry, float $stopLoss, float $tp1, float $tp2, float $price, string $currentStatus = 'Running'): string
+{
+    $current = normalize_trade_status($currentStatus);
+    $isLong = $stopLoss < $entry;
+
+    if ($isLong) {
+        if ($price <= $stopLoss) {
+            return 'Loss'; // stop-loss priority
+        }
+        if ($price >= $tp2) {
+            return 'Win';
+        }
+        if ($current === 'Running' && $price >= $tp1) {
+            return 'Partially Closed';
+        }
+        return $current;
+    }
+
+    if ($price >= $stopLoss) {
+        return 'Loss'; // stop-loss priority
+    }
+    if ($price <= $tp2) {
+        return 'Win';
+    }
+    if ($current === 'Running' && $price <= $tp1) {
+        return 'Partially Closed';
+    }
+
+    return $current;
+}
